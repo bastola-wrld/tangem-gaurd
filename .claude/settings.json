@@ -1,0 +1,25 @@
+{
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "mcp__.*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/hook.js\"",
+            "timeout": 30
+          }
+        ]
+      }
+    ]
+  },
+  "permissions": {
+    "deny": [
+      "Edit(~/.tangem-guard/**)",
+      "Bash(node cli.js add:*)",
+      "Bash(node cli.js confirm:*)",
+      "Bash(node cli.js remove:*)",
+      "Bash(node cli.js policy:*)"
+    ]
+  }
+}
