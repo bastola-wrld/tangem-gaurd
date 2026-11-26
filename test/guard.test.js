@@ -90,6 +90,19 @@ test("GoPlus down: WARN, not a silent pass", async () => {
   assert.equal(r.verdict, "WARN");
 });
 
+test("price falls back to Coinbase when CoinGecko refuses", async () => {
+  const fetchImpl = async (url) => {
+    if (String(url).includes("coingecko")) return { ok: false, status: 429, json: async () => ({}) };
+    if (String(url).includes("coinbase.com/v2/prices/BTC-GBP")) return { ok: true, status: 200, json: async () => ({ data: { amount: "60000.5", base: "BTC", currency: "GBP" } }) };
+    throw new Error("unexpected");
+  };
+  const p = await core.priceGBP({ coinId: "bitcoin" }, fetchImpl);
+  assert.equal(p.gbp, 60000.5);
+  assert.equal(p.source, "Coinbase");
+  const saved = JSON.parse(fs.readFileSync(path.join(DATA, "prices.json"), "utf8"));
+  assert.equal(saved.bitcoin.gbp, 60000.5);
+});
+
 test("tool classification", () => {
   assert.equal(hook.classify("mcp__tangem__send_transaction"), "send");
   assert.equal(hook.classify("mcp__tangem__transactions_send_transaction"), "send");

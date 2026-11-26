@@ -237,10 +237,46 @@ async function getJson(url, fetchImpl, headers = { accept: "application/json" })
 }
 
 const priceCache = new Map();
+const PRICE_FILE = path.join(DATA_DIR, "prices.json");
+const FRESH_MS = 2 * 60 * 1000; // reuse a price for 2 minutes without asking again
+const STALE_MS = 6 * 60 * 60 * 1000; // if every source fails, a price up to 6 hours old is still fine for a limit check
+
+// Coinbase symbols, used as a backup when CoinGecko refuses (it limits free requests).
+const COINBASE_SYMBOL = {
+  ethereum: "ETH", bitcoin: "BTC", "usd-coin": "USDC", tether: "USDT", dai: "DAI", solana: "SOL",
+  "polygon-ecosystem-token": "POL", "avalanche-2": "AVAX", dogecoin: "DOGE", litecoin: "LTC",
+  cardano: "ADA", ripple: "XRP", arbitrum: "ARB", optimism: "OP", weth: "ETH", "wrapped-bitcoin": "BTC",
+};
+
+function readPriceFile() {
+  try {
+    return JSON.parse(fs.readFileSync(PRICE_FILE, "utf8"));
+  } catch {
+    return {};
+  }
+}
+
+function writePrice(key, gbp, source) {
+  try {
+    const all = readPriceFile();
+    all[key] = { gbp, source, ts: Date.now() };
+    fs.mkdirSync(DATA_DIR, { recursive: true });
+    fs.writeFileSync(PRICE_FILE, JSON.stringify(all, null, 2));
+  } catch { /* a price cache must never break a check */ }
+}
 
 export async function priceGBP({ coinId, contract, network }, fetchImpl = globalThis.fetch) {
-  const key = coinId || `${network}:${contract}`;
+  const key = coinId || `${network}:${String(contract).toLowerCase()}`;
   if (priceCache.has(key)) return priceCache.get(key);
+
+  const saved = readPriceFile()[key];
+  const age = saved ? Date.now() - saved.ts : Infinity;
+  if (saved && age < FRESH_MS) {
+    const r = { gbp: saved.gbp, source: saved.source };
+    priceCache.set(key, r);
+    return r;
+  }
+
   const headers = { accept: "application/json" };
   if (process.env.COINGECKO_API_KEY) headers["x-cg-demo-api-key"] = process.env.COINGECKO_API_KEY;
   let result = null;
@@ -255,7 +291,18 @@ export async function priceGBP({ coinId, contract, network }, fetchImpl = global
       const v = j?.[c]?.gbp;
       if (typeof v === "number") result = { gbp: v, source: "CoinGecko" };
     }
-  } catch { /* fall back below */ }
+  } catch { /* try the backup below */ }
+
+  if (!result && coinId && COINBASE_SYMBOL[coinId]) {
+    try {
+      const j = await getJson(`https://api.coinbase.com/v2/prices/${COINBASE_SYMBOL[coinId]}-GBP/spot`, fetchImpl);
+      const v = Number(j?.data?.amount);
+      if (Number.isFinite(v) && v > 0) result = { gbp: v, source: "Coinbase" };
+    } catch { /* fall back below */ }
+  }
+
+  if (result) writePrice(key, result.gbp, result.source);
+  if (!result && saved && age < STALE_MS) result = { gbp: saved.gbp, source: `${saved.source}, saved ${Math.round(age / 60000)} min ago` };
   if (!result && coinId && STABLE_USD.has(coinId)) result = { gbp: Number(process.env.GBP_PER_USD || 0.76), source: "approximate stablecoin rate" };
   if (!result && coinId === "euro-coin") result = { gbp: Number(process.env.GBP_PER_EUR || 0.85), source: "approximate stablecoin rate" };
   if (result) priceCache.set(key, result);

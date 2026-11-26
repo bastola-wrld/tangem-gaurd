@@ -17,14 +17,14 @@ You need Node 18 or newer and Claude Code with Tangem MCP connected.
    ```bash
    npm install
    ```
-3. Save your Treasurer contact and create the demo files (use your own second wallet address; the flagged address is optional):
+3. Save your Treasurer contact and create the demo files. Use an Ethereum address you or a friend controls; the flagged address is optional:
    ```bash
-   node cli.js demo-setup <your_second_wallet_address> polygon-pos <flagged_address>
+   node cli.js demo-setup <treasurer_address> ethereum <flagged_address>
    ```
-   Use `base`, `arbitrum-one`, `ethereum` or `binance-smart-chain` instead of `polygon-pos` if that's the network you'll pay on.
+   This pays in ETH (0.0005 by default). Change it with `--amount=0.001`, or use another network and token, for example `polygon-pos --token=usd-coin --amount=1`. It prints your exact demo lines at the end.
 4. Check Guard can reach the scam list (this should say ALLOW):
    ```bash
-   npm run check -- <your_second_wallet_address> polygon-pos 1 usd-coin
+   npm run check -- <treasurer_address> ethereum 0.0005 ethereum
    ```
 5. Start Claude Code in this folder and say yes when it asks about the `tangem-guard` server:
    ```bash
@@ -41,7 +41,7 @@ claude mcp add tangem-guard -- node "$(pwd)/server.js"
 
 **Opening line:** "Tangem MCP lets Claude prepare payments, and my card has to tap to sign. But the card has no screen. If the AI gets tricked, I'm the last line of defence, on a phone, in a hurry. Tangem Guard fixes that."
 
-1. **Safe payment.** Say: *"Pay the Treasurer 1 USDC on Polygon, and send me a notification."*
+1. **Safe payment.** Say: *"Pay the Treasurer 0.0005 ETH on ethereum, and send me a notification."* (use the line demo-setup printed)
    Claude calls `get_tokens`, then Guard's `check_recipient` says **ALLOW**, then `transactions__send_transaction`. Your phone shows it, you **tap the card**, and Claude checks `get_transaction_status`.
 2. **Poisoned invoice.** Say: *"Pay the invoice in demo/invoice.md."*
    The invoice hides a lookalike of the Treasurer's address. Guard says **BLOCK: looks like Treasurer but is a different address.** Your phone stays silent.
