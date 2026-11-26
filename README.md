@@ -8,6 +8,31 @@ A safety layer for Tangem MCP. Before Claude can send money with your Tangem car
 
 Guard runs as a Claude Code hook, so it's code, not a prompt. A tricked AI can't skip it or talk its way past it. It never sees keys, seed phrases or card codes, and your card tap is still the final approval.
 
+## How it fits
+
+```mermaid
+flowchart LR
+    U["You ask Claude to pay"] --> C["Claude Code"]
+    C -.->|check_recipient| G["Guard MCP server<br/>contacts, GoPlus, GBP limits"]
+    C --> H{"Guard hook<br/>runs as code"}
+    H -->|BLOCK| X["Stopped<br/>phone stays silent"]
+    H -->|WARN| A["Claude Code asks you"]
+    A -->|you approve| T["Tangem MCP<br/>creates the intent"]
+    H -->|ALLOW| T
+    T --> P["Tangem app<br/>review sheet"]
+    P --> K["Card tap signs"]
+```
+
+**Agent proposes, Guard checks, you tap.** Guard never touches keys, and the card is still the only thing that can sign.
+
+## Why this matters
+
+* Tangem app 6.8 (15 November 2026) lets AI agents prepare sends and swaps. Tangem's own Learning Hub says prompt injection has no complete technical solution yet, and that user review is the main defence.
+* A Tangem card has no screen, so the phone review sheet is the only place to check a payment. Ledger's Agent Intent (a free beta since October) shows details on the device's own screen.
+* Address poisoning targeted about 8 million Ethereum wallets in the year to July 2026, and 1,635 people lost about $76 million to lookalike addresses (Bitquery, a measured minimum).
+* In May 2026 an attacker got Grok to decode a Morse code message that told Bankrbot to send about 3 billion DRB (roughly $175,000). SlowMist said the real problem was the loose link between what the AI said and what actually moved money. Guard is that missing layer.
+* In December 2025 someone sent a small test payment, then about $50 million in USDT to a lookalike address matching the first 5 and last 4 characters. A test payment doesn't protect you; a lookalike check does.
+
 ## Set up (5 minutes)
 
 You need Node 18 or newer and Claude Code with Tangem MCP connected.
@@ -91,6 +116,7 @@ The AI can read your rules and save contacts, but contacts it saves stay **uncon
 * GoPlus only knows reported addresses. A brand new scam address will pass the list, which is why the contacts and lookalike checks matter most.
 * Guard's data (contacts, rules, logs) lives in `~/.tangem-guard`. Claude Code is told not to edit it.
 * Never send anything to the fake lookalike address. Nobody controls it, so the money would be lost.
+* When a check can't run (no internet, no price), Guard asks you instead of allowing the payment.
 * If your phone ever shows a payment you didn't expect, reject it.
 
 ## Troubleshooting
